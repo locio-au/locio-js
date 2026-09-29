@@ -1,0 +1,31 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Trusted publishing: npm verifies this workflow's identity, so there is no
+# long lived token in the repository to leak. Requires npm CLI 11.5+ and the
+# publisher configured on npmjs.com for @locio-au/client.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      # Node 22 bundles npm 10, which cannot mint the OIDC token that trusted
+      # publishing needs. Pin the publishing CLI independently of the Node
+      # version the tests run against.
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm run typecheck && npm test && npm run build
+      # --provenance links the published tarball to this commit and workflow,
+      # so anyone installing it can verify where it was built.
+      - run: npm publish --provenance --access public
